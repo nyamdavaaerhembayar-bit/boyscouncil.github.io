@@ -154,9 +154,11 @@ async function login(){
     email,password
   });
 
-  if(error){
-    showMessage("loginStatus","Email эсвэл password буруу байна.");
+ if(error){
+    console.log("LOGIN ERROR:", error);
+    showMessage("loginStatus", error.message);
     return;
+}
   }
 
   await checkAdmin(data.user);
