@@ -1,4 +1,4 @@
-  
+
 <!DOCTYPE html>
 <html lang="mn">
 <head>
@@ -8,14 +8,20 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#0b1020;color:white;font-family:Arial}
-header{padding:25px;text-align:center;background:#151d32}
-h1{color:#65aaff}
-main{max-width:750px;margin:35px auto;padding:15px}
-.card{background:#19243b;padding:25px;border-radius:15px;margin-bottom:20px}
+body{margin:0;background:#0b1020;color:white;font-family:Arial,sans-serif}
+header{background:#151d32;padding:24px;text-align:center}
+h1{color:#65aaff;margin:0}
+main{max-width:900px;margin:30px auto;padding:15px}
+.card{background:#19243b;padding:24px;border-radius:14px;margin-bottom:20px}
 input,textarea{width:100%;padding:13px;margin:8px 0;background:#0b1020;color:white;border:1px solid #40516e;border-radius:8px}
-button{padding:12px 20px;background:#3478f6;color:white;border:0;border-radius:8px;cursor:pointer;margin:5px}
+textarea{min-height:100px}
+button{padding:11px 18px;border:0;border-radius:8px;background:#3478f6;color:white;cursor:pointer;margin:5px}
+.danger{background:#d94343}
+.secondary{background:#53647d}
 .hidden{display:none}
+.post{border-bottom:1px solid #40516e;padding:15px 0}
+small{color:#a9b9d0}
+#status{color:#8fc3ff}
 </style>
 </head>
 <body>
@@ -23,6 +29,7 @@ button{padding:12px 20px;background:#3478f6;color:white;border:0;border-radius:8
 <h1>BOYS COUNCIL</h1>
 <p>Манай зөвлөл • Манай ирээдүй</p>
 </header>
+
 <main>
 <section class="card">
 <h2>Тавтай морил!</h2>
@@ -30,8 +37,8 @@ button{padding:12px 20px;background:#3478f6;color:white;border:0;border-radius:8
 </section>
 
 <section class="card">
-<h2>Нийтэд зориулсан мэдээлэл</h2>
-<div id="posts">Мэдээлэл ачаалж байна...</div>
+<h2>Мэдээлэл</h2>
+<div id="posts">Ачаалж байна...</div>
 </section>
 
 <section class="card">
@@ -41,12 +48,37 @@ button{padding:12px 20px;background:#3478f6;color:white;border:0;border-radius:8
 <p id="feedbackStatus"></p>
 </section>
 
-<section class="card">
-<h2>Удирдлагын нэвтрэх хэсэг</h2>
-<input id="phone" placeholder="Утасны дугаар">
+<section class="card" id="loginBox">
+<h2>Admin нэвтрэх</h2>
+<input id="email" type="email" placeholder="Email">
 <input id="password" type="password" placeholder="Password">
 <button onclick="login()">Нэвтрэх</button>
 <p id="loginStatus"></p>
+</section>
+
+<section class="card hidden" id="dashboard">
+<h2>Admin Dashboard</h2>
+<p>Тавтай морил, Admin!</p>
+<button class="secondary" onclick="logout()">Гарах</button>
+
+<hr>
+
+<h3>Мэдээлэл нэмэх / засах</h3>
+<input id="postId" type="hidden">
+<input id="postTitle" placeholder="Мэдээллийн гарчиг">
+<textarea id="postContent" placeholder="Мэдээллийн агуулга"></textarea>
+<label><input id="published" type="checkbox" checked style="width:auto"> Нийтлэх</label>
+<br>
+<button onclick="savePost()">Хадгалах</button>
+<button class="secondary" onclick="clearForm()">Цэвэрлэх</button>
+<p id="adminStatus"></p>
+
+<h3>Нийтлэлүүд</h3>
+<div id="adminPosts"></div>
+
+<hr>
+<h3>Ирсэн санал хүсэлт</h3>
+<div id="feedbackList"></div>
 </section>
 </main>
 
@@ -54,86 +86,233 @@ button{padding:12px 20px;background:#3478f6;color:white;border:0;border-radius:8
 const SUPABASE_URL = "https://bdguiubxteeeyuizcnwh.supabase.co/rest/v1/";
 const SUPABASE_KEY = "sb_publishable_LK7BnVYtVwhsEY0YKoJI9Q_2dewa_Hi";
 
-const db = supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const db = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_KEY
+);
 
-async function login(){
- const phone=document.getElementById("phone").value.trim();
- const password=document.getElementById("password").value;
- const status=document.getElementById("loginStatus");
-
- status.textContent="Шалгаж байна...";
- const {data,error}=await db.auth.signInWithPassword({phone,password});
-
- if(error){
-   status.textContent="Нэвтрэх боломжгүй: "+error.message;
-   return;
- }
-
- const {data:admin,error:adminError}=await db
- .from("council_admins")
- .select("user_id")
- .eq("user_id",data.user.id)
- .maybeSingle();
-
- if(adminError || !admin){
-   await db.auth.signOut();
-   status.textContent="Танд удирдлагын эрх олгогдоогүй байна.";
-   return;
- }
-
- status.textContent="Амжилттай нэвтэрлээ!";
+function showMessage(id,message){
+  document.getElementById(id).textContent=message;
 }
 
 async function loadPosts(){
- const {data,error}=await db.from("council_posts")
- .select("title,content")
- .order("created_at",{ascending:false});
+  const {data,error}=await db.from("council_posts")
+    .select("id,title,content,created_at")
+    .eq("published",true)
+    .order("created_at",{ascending:false});
 
- const area=document.getElementById("posts");
+  const area=document.getElementById("posts");
+  area.replaceChildren();
 
- if(error){
-   area.textContent="Мэдээлэл одоогоор ачаалж чадсангүй.";
-   return;
- }
+  if(error){
+    area.textContent="Мэдээлэл ачааллахад алдаа гарлаа.";
+    return;
+  }
 
- area.innerHTML="";
- data.forEach(post=>{
-   const article=document.createElement("article");
-   const title=document.createElement("h3");
-   const content=document.createElement("p");
-   title.textContent=post.title;
-   content.textContent=post.content;
-   article.append(title,content);
-   area.append(article);
- });
+  if(!data.length){
+    area.textContent="Одоогоор мэдээлэл алга.";
+    return;
+  }
+
+  data.forEach(p=>{
+    const article=document.createElement("article");
+    const title=document.createElement("h3");
+    const content=document.createElement("p");
+    title.textContent=p.title;
+    content.textContent=p.content;
+    article.append(title,content);
+    article.className="post";
+    area.append(article);
+  });
 }
 
 async function sendFeedback(){
- const message=document.getElementById("feedback").value.trim();
- const status=document.getElementById("feedbackStatus");
+  const message=document.getElementById("feedback").value.trim();
+  if(!message){
+    showMessage("feedbackStatus","Санал хүсэлтээ бичнэ үү.");
+    return;
+  }
 
- if(!message){
-   status.textContent="Санал хүсэлтээ бичнэ үү.";
-   return;
- }
+  const {error}=await db.from("council_feedback")
+    .insert({message});
 
- const {error}=await db.from("council_feedback")
- .insert({message});
-
- status.textContent=error
- ? "Илгээхэд алдаа гарлаа."
- : "Санал хүсэлт амжилттай илгээгдлээ!";
-
- if(!error) document.getElementById("feedback").value="";
+  if(error){
+    showMessage("feedbackStatus","Алдаа гарлаа. Дахин оролдоно уу.");
+  }else{
+    showMessage("feedbackStatus","Амжилттай илгээгдлээ!");
+    document.getElementById("feedback").value="";
+  }
 }
 
-if(SUPABASE_URL.startsWith("https://") &&
-   SUPABASE_KEY.startsWith("sb_publishable_")){
- loadPosts();
-}else{
- document.getElementById("posts").textContent=
- "Supabase холболтын мэдээллээ тохируулна уу.";
+async function login(){
+  const email=document.getElementById("email").value.trim();
+  const password=document.getElementById("password").value;
+
+  showMessage("loginStatus","Нэвтэрч байна...");
+
+  const {data,error}=await db.auth.signInWithPassword({
+    email,password
+  });
+
+  if(error){
+    showMessage("loginStatus","Email эсвэл password буруу байна.");
+    return;
+  }
+
+  await checkAdmin(data.user);
 }
+
+async function checkAdmin(user){
+  const {data,error}=await db.from("council_admins")
+    .select("user_id")
+    .eq("user_id",user.id)
+    .maybeSingle();
+
+  if(error || !data){
+    await db.auth.signOut();
+    showMessage("loginStatus","Танд Admin эрх байхгүй байна.");
+    return;
+  }
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  await loadAdminPosts();
+  await loadFeedback();
+}
+
+async function savePost(){
+  const id=document.getElementById("postId").value;
+  const title=document.getElementById("postTitle").value.trim();
+  const content=document.getElementById("postContent").value.trim();
+  const published=document.getElementById("published").checked;
+
+  if(!title || !content){
+    showMessage("adminStatus","Гарчиг болон агуулгаа бөглөнө үү.");
+    return;
+  }
+
+  const record={title,content,published};
+
+  const result=id
+    ? await db.from("council_posts").update(record).eq("id",id)
+    : await db.from("council_posts").insert(record);
+
+  if(result.error){
+    showMessage("adminStatus","Хадгалахад алдаа гарлаа.");
+    return;
+  }
+
+  showMessage("adminStatus","Амжилттай хадгаллаа!");
+  clearForm();
+  await loadAdminPosts();
+  await loadPosts();
+}
+
+function clearForm(){
+  document.getElementById("postId").value="";
+  document.getElementById("postTitle").value="";
+  document.getElementById("postContent").value="";
+  document.getElementById("published").checked=true;
+}
+
+async function loadAdminPosts(){
+  const {data,error}=await db.from("council_posts")
+    .select("*").order("created_at",{ascending:false});
+
+  const area=document.getElementById("adminPosts");
+  area.replaceChildren();
+
+  if(error){
+    area.textContent="Нийтлэл ачааллахад алдаа гарлаа.";
+    return;
+  }
+
+  data.forEach(p=>{
+    const item=document.createElement("div");
+    item.className="post";
+
+    const title=document.createElement("h4");
+    title.textContent=p.title;
+
+    const state=document.createElement("small");
+    state.textContent=p.published?"Нийтэлсэн":"Ноорог";
+
+    const edit=document.createElement("button");
+    edit.textContent="Засах";
+    edit.onclick=()=>{
+      document.getElementById("postId").value=p.id;
+      document.getElementById("postTitle").value=p.title;
+      document.getElementById("postContent").value=p.content;
+      document.getElementById("published").checked=p.published;
+      window.scrollTo(0,document.body.scrollHeight);
+    };
+
+    const del=document.createElement("button");
+    del.textContent="Устгах";
+    del.className="danger";
+    del.onclick=()=>deletePost(p.id);
+
+    item.append(title,state,document.createElement("br"),edit,del);
+    area.append(item);
+  });
+}
+
+async function deletePost(id){
+  if(!confirm("Энэ мэдээллийг устгах уу?"))return;
+
+  const {error}=await db.from("council_posts").delete().eq("id",id);
+
+  if(error){
+    showMessage("adminStatus","Устгахад алдаа гарлаа.");
+    return;
+  }
+
+  await loadAdminPosts();
+  await loadPosts();
+}
+
+async function loadFeedback(){
+  const {data,error}=await db.from("council_feedback")
+    .select("*").order("created_at",{ascending:false});
+
+  const area=document.getElementById("feedbackList");
+  area.replaceChildren();
+
+  if(error){
+    area.textContent="Санал хүсэлт ачааллахад алдаа гарлаа.";
+    return;
+  }
+
+  if(!data.length){
+    area.textContent="Одоогоор санал хүсэлт алга.";
+    return;
+  }
+
+  data.forEach(f=>{
+    const item=document.createElement("p");
+    item.className="post";
+    item.textContent=f.message;
+    area.append(item);
+  });
+}
+
+async function logout(){
+  await db.auth.signOut();
+  document.getElementById("dashboard").classList.add("hidden");
+  document.getElementById("loginBox").classList.remove("hidden");
+  showMessage("loginStatus","Та системээс гарлаа.");
+}
+
+async function restoreSession(){
+  const {data}=await db.auth.getSession();
+  if(data.session){
+    await checkAdmin(data.session.user);
+  }
+}
+
+loadPosts();
+restoreSession();
 </script>
 </body>
 </html>
