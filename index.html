@@ -163,14 +163,33 @@ async function login(){
 }
 
 async function checkAdmin(user){
-  const {data,error}=await db.from("council_admins")
+  const {data,error}=await db
+    .from("council_admins")
     .select("user_id")
     .eq("user_id",user.id)
     .maybeSingle();
 
-  console.log("USER ID:", user.id);
-  console.log("ADMIN DATA:", data);
-  console.log("ADMIN ERROR:", error);
+  console.log("USER ID:",user.id);
+  console.log("ADMIN DATA:",data);
+  console.log("ADMIN ERROR:",error);
+
+  if(error){
+    console.log("ADMIN CHECK FAILED:",error.message);
+    showMessage("loginStatus","Admin шалгахад алдаа гарлаа: "+error.message);
+    return;
+  }
+
+  if(!data){
+    showMessage("loginStatus","Танд Admin эрх байхгүй байна.");
+    return;
+  }
+
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("dashboard").classList.remove("hidden");
+
+  await loadAdminPosts();
+  await loadFeedback();
+}
 
   if(error || !data){
     await db.auth.signOut();
