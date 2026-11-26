@@ -143,7 +143,6 @@ async function sendFeedback(){
     document.getElementById("feedback").value="";
   }
 }
-
 async function login(){
   const email=document.getElementById("email").value.trim();
   const password=document.getElementById("password").value;
@@ -154,11 +153,10 @@ async function login(){
     email,password
   });
 
- if(error){
+  if(error){
     console.log("LOGIN ERROR:", error);
     showMessage("loginStatus", error.message);
     return;
-}
   }
 
   await checkAdmin(data.user);
