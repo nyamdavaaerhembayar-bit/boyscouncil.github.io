@@ -168,6 +168,10 @@ async function checkAdmin(user){
     .eq("user_id",user.id)
     .maybeSingle();
 
+  console.log("USER ID:", user.id);
+  console.log("ADMIN DATA:", data);
+  console.log("ADMIN ERROR:", error);
+
   if(error || !data){
     await db.auth.signOut();
     showMessage("loginStatus","Танд Admin эрх байхгүй байна.");
