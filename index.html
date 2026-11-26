@@ -190,20 +190,7 @@ async function checkAdmin(user){
   await loadAdminPosts();
   await loadFeedback();
 }
-
-  if(error || !data){
-    await db.auth.signOut();
-    showMessage("loginStatus","Танд Admin эрх байхгүй байна.");
-    return;
-  }
-
-  document.getElementById("loginBox").classList.add("hidden");
-  document.getElementById("dashboard").classList.remove("hidden");
-
-  await loadAdminPosts();
-  await loadFeedback();
-}
-
+  
 async function savePost(){
   const id=document.getElementById("postId").value;
   const title=document.getElementById("postTitle").value.trim();
